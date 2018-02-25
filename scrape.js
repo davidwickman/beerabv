@@ -20,10 +20,11 @@ request(mainUrl, function (error, response, html) {
           var abvRegex = /Approximately [\s\S]*ABV/g;
           var productText = $('.item').text();
           var productAbvText = abvRegex.exec(productText);
+          var productAbvTextKeep = productAbvText[0].replace('Approximately ', '');
 
           var productInfo = {
             productName: productName,
-            productAbvText: productAbvText[0],
+            productAbvText: productAbvTextKeep,
             productUrl: productUrl
           }
           console.log(productInfo);
