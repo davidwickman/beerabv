@@ -1,41 +1,72 @@
-var cheerio = require('cheerio');
-var request = require('request');
+const cheerio = require('cheerio');
+const fs = require('fs');
+const _ = require('lodash');
+const request = require('request');
 
-var baseUrl = 'https://www.austinhomebrew.com/';
-var beerArray = [];
-var mainUrl = baseUrl + 'Mini-Mash-IPA-Kits_c_220-1-2.html';
+const baseUrl = 'https://www.austinhomebrew.com/';
+const beerArray = [];
+const mainUrl = `${baseUrl}Mini-Mash-IPA-Kits_c_220-1-2.html`;
+const resultsFileName = './results/beerResults.json';
+const lagerText = {
+  leadingText: 'Scraping Beer #',
+  beerCount: 1,
+  beerName: '',
+  beerEmoji: '',
+};
 
-request(mainUrl, function (error, response, html) {
+function writeFile(file, data) {
+  fs.writeFileSync(file, data);
+}
+
+request(mainUrl, (error, response, html) => {
+  console.log(`🚀  Starting Quick Scrape of
+${mainUrl}`);
+
   if (!error && response.statusCode == 200) {
-    var $ = cheerio.load(html);
-    var products = $('.product-item .img a');
+    const $ = cheerio.load(html);
+    const products = $('.product-item .img a');
 
-    products.each(function(i, element){
-      var productPage = $(this).attr('href');
-      var productUrl = baseUrl + productPage;
+    products.each(function (i, element) {
+      const productPage = $(this).attr('href');
+      const productUrl = baseUrl + productPage;
 
-      request(productUrl, function (error, response, html) {
+      request(productUrl, (error, response, html) => {
         if (!error && response.statusCode == 200) {
-          var $ = cheerio.load(html);
-          var productName = $('.page_headers').text();
-          var abvRegex = /Approximately [\s\S]*ABV/g;
-          var productText = $('.item').text();
-          var productAbvText = abvRegex.exec(productText);
-          var productAbvTextKeep = productAbvText[0].replace('Approximately ', '');
-          var productPriceEl = $('.yourprice.price');
-          var productPrice = productPriceEl.text().replace('Your Price:', '');
-
-          var priceAbv = Number(productPrice.replace('$', ''))/Number(productAbvTextKeep.replace('% ABV', ''));
-
-          var productInfo = {
-            productName: productName,
+          const $ = cheerio.load(html);
+          const productName = $('.page_headers').text();
+          const abvRegex = /Approximately [\s\S]*ABV/g;
+          const productText = $('.item').text();
+          const productAbvText = abvRegex.exec(productText);
+          const productAbvTextKeep = productAbvText[0].replace(/Approximately|%|ABV/g, '').trim();
+          const productPriceEl = $('.yourprice.price');
+          const productPrice = productPriceEl.text().replace('Your Price:', '');
+          const priceAbv = Number(productPrice.replace('$', '')) / Number(productAbvTextKeep);
+          const productInfo = {
+            productName,
             productAbvText: productAbvTextKeep,
-            productPrice: productPrice,
-            priceAbv: priceAbv,
-            productUrl: productUrl
-          }
-          console.log(productInfo);
+            productPrice,
+            priceAbv,
+            productUrl,
+          };
+
+          console.log(`${lagerText.leadingText}${lagerText.beerCount++}: ${productName}
+${lagerText.beerEmoji += '🍺 '}
+`);
+
           beerArray.push(productInfo);
+
+          if (lagerText.beerCount === products.length + 1) {
+            console.log(`🍻  Cheers, We Found: ${products.length} Beers!
+Saving file: ${resultsFileName}`);
+
+            const sorted = _.orderBy(beerArray, ['priceAbv'], ['asc']);
+
+            fs.writeFileSync(resultsFileName, JSON.stringify(sorted, null, 2));
+
+            console.log(`
+Finished Quick Scrape of
+${mainUrl}`);
+          }
         }
       });
     });
